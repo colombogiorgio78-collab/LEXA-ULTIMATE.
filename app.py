@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import fitz
 import google.generativeai as genai
 import streamlit.components.v1 as components
@@ -43,22 +43,37 @@ with col_out:
         else:
             try:
                 genai.configure(api_key=api_key)
-                # Proviamo il modello più stabile
-                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                with st.spinner("Analisi in corso..."):
-                    prompt = f"Sei un avvocato esperto in {jurisdiction}. Analizza questo contratto per rischi IP e clausole critiche: \n\n {testo_da_analizzare[:20000]}"
-                    response = model.generate_content(prompt)
-                    
-                    if response:
-                        st.markdown(f"<div class='report-card'>{response.text}</div>", unsafe_allow_html=True)
-                        # Tasto audio
-                        clean_text = response.text.replace("'", " ").replace("\n", " ")
-                        tts = f"""<script>function speak() {{ var m = new SpeechSynthesisUtterance(); m.text='{clean_text}'; m.lang='it-IT'; window.speechSynthesis.speak(m); }}</script>
-                        <button onclick="speak()" style="width:100%;height:50px;background:#FFD700;border-radius:10px;font-weight:bold;cursor:pointer;border:none;">🔊 ASCOLTA ANALISI</button>"""
-                        components.html(tts, height=70)
-            except Exception as e:
-                # QUESTA RIGA CI DIRÀ LA VERITÀ SULL'ERRORE
-                st.error(f"ERRORE TECNICO: {str(e)}")
+                # --- LOGICA DI FALLBACK (PROVA PIÙ MODELLI) ---
+                modelli_da_provare = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+                response = None
+                modello_funzionante = ""
 
-st.caption("LEXA EUROPE v2.1")
+                for nome_modello in modelli_da_provare:
+                    try:
+                        model = genai.GenerativeModel(nome_modello)
+                        with st.spinner(f"Tentativo con {nome_modello}..."):
+                            prompt = f"Sei un avvocato esperto in {jurisdiction}. Analizza questo contratto per rischi IP e clausole critiche: \n\n {testo_da_analizzare}"
+                            response = model.generate_content(prompt)
+                            modello_funzionante = nome_modello
+                            break # Se funziona, esce dal ciclo
+                    except:
+                        continue # Se fallisce, prova il prossimo
+
+                if response:
+                    st.success(f"Analisi completata con {modello_funzionante}")
+                    st.markdown(f"<div class='report-card'>{response.text}</div>", unsafe_allow_html=True)
+                    
+                    # Tasto audio (Text-to-Speech)
+                    # Puliamo il testo per evitare errori nel JavaScript
+                    clean_text = response.text.replace("'", " ").replace('"', " ").replace("\n", " ").replace("`", "")
+                    tts = f"""<script>function speak() {{ window.speechSynthesis.cancel(); var m = new SpeechSynthesisUtterance(); m.text='{clean_text[:3000]}'; m.lang='it-IT'; window.speechSynthesis.speak(m); }}</script>
+                    <button onclick="speak()" style="width:100%;height:50px;background:#FFD700;border-radius:10px;font-weight:bold;cursor:pointer;border:none;">🔊 ASCOLTA ANALISI</button>"""
+                    components.html(tts, height=70)
+                else:
+                    st.error("Nessun modello Google Gemini disponibile con questa chiave. Verifica il credito su AI Studio.")
+
+            except Exception as e:
+                st.error(f"ERRORE GENERALE: {str(e)}")
+
+st.caption("LEXA EUROPE v2.2 - Multi-Model Edition")
