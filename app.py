@@ -3,8 +3,7 @@ import fitz
 import google.generativeai as genai
 import streamlit.components.v1 as components
 
-# 1. SETTINGS ESTETICI
-st.set_page_config(page_title="LEXA EUROPE - AI Legal", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="LEXA EUROPE", page_icon="⚖️", layout="wide")
 
 st.markdown("""
     <style>
@@ -13,15 +12,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. SIDEBAR
 with st.sidebar:
     st.title("⚖️ LEXA PANEL")
     api_key = st.text_input("Inserisci Gemini API Key", type="password")
-    jurisdiction = st.selectbox("Seleziona Giurisdizione", 
-        ["Italia", "Unione Europea", "Francia", "Spagna", "International"])
-    st.info("LEXA analizzerà il contratto secondo le leggi della nazione scelta.")
+    jurisdiction = st.selectbox("Seleziona Giurisdizione", ["Italia", "Unione Europea", "International"])
 
-# 3. INTERFACCIA PRINCIPALE
 st.title("⚖️ LEXA EUROPE: Intelligenza Legale")
 col_in, col_out = st.columns([1, 1], gap="large")
 
@@ -40,7 +35,6 @@ with col_in:
         if testo_manuale:
             testo_da_analizzare = testo_manuale
 
-# 4. MOTORE AI CON FALLBACK (PER EVITARE ERRORI 404)
 with col_out:
     st.subheader("📊 Report LEXA")
     if st.button("🚀 AVVIA ANALISI PROFESSIONALE"):
@@ -49,38 +43,22 @@ with col_out:
         else:
             try:
                 genai.configure(api_key=api_key)
-                # Prova diversi nomi di modello per sicurezza
-                model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-                response_text = ""
-                for m_name in model_names:
-                    try:
-                        model = genai.GenerativeModel(m_name)
-                        prompt = f"Sei un avvocato esperto in {jurisdiction}. Analizza questo contratto per rischi IP, recesso e penali. Sii schematico: \n\n {testo_da_analizzare[:20000]}"
-                        response = model.generate_content(prompt)
-                        response_text = response.text
-                        break
-                    except: continue
+                # Proviamo il modello più stabile
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                if response_text:
-                    st.markdown(f"<div class='report-card'>{response_text}</div>", unsafe_allow_html=True)
+                with st.spinner("Analisi in corso..."):
+                    prompt = f"Sei un avvocato esperto in {jurisdiction}. Analizza questo contratto per rischi IP e clausole critiche: \n\n {testo_da_analizzare[:20000]}"
+                    response = model.generate_content(prompt)
                     
-                    # --- TASTO PER ASCOLTARE LA RISPOSTA ---
-                    clean_text = response_text.replace("`", "").replace("'", " ").replace("\n", " ")
-                    tts_script = f"""
-                    <script>
-                    function speak() {{
-                        var msg = new SpeechSynthesisUtterance();
-                        msg.text = '{clean_text}';
-                        msg.lang = 'it-IT';
-                        window.speechSynthesis.speak(msg);
-                    }}
-                    </script>
-                    <button onclick="speak()" style="width:100%; height:50px; background-color:#FFD700; border-radius:10px; font-weight:bold; cursor:pointer; border:none;">
-                        🔊 ASCOLTA L'ANALISI (VOCE AI)
-                    </button>
-                    """
-                    components.html(tts_script, height=70)
-                else:
-                    st.error("Errore di connessione AI. Riprova.")
+                    if response:
+                        st.markdown(f"<div class='report-card'>{response.text}</div>", unsafe_allow_html=True)
+                        # Tasto audio
+                        clean_text = response.text.replace("'", " ").replace("\n", " ")
+                        tts = f"""<script>function speak() {{ var m = new SpeechSynthesisUtterance(); m.text='{clean_text}'; m.lang='it-IT'; window.speechSynthesis.speak(m); }}</script>
+                        <button onclick="speak()" style="width:100%;height:50px;background:#FFD700;border-radius:10px;font-weight:bold;cursor:pointer;border:none;">🔊 ASCOLTA ANALISI</button>"""
+                        components.html(tts, height=70)
             except Exception as e:
-                st.error(f"Errore: {e}")
+                # QUESTA RIGA CI DIRÀ LA VERITÀ SULL'ERRORE
+                st.error(f"ERRORE TECNICO: {str(e)}")
+
+st.caption("LEXA EUROPE v2.1")
